@@ -174,5 +174,4 @@ singularity exec mitim_centos7rw.img python -c "import MDSplus; tree=MDSplus.Tre
 
 # 5.
 # Create read-only image
-vagrant ssh -c "sudo /usr/local/bin/singularity build mitim_centos7ro.img mitim_centos7rw.img"
-
+sudo singularity build mitim_centos7ro.img mitim_centos7rw.img
