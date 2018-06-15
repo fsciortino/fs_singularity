@@ -9,6 +9,7 @@ From: centos:latest
 
 %environment
  export LC_ALL=C
+ export LD_LIBRARY_PATH=/MultiNest/lib/:$LD_LIBRARY_PATH
 
 %setup
  echo "Working dir is" $PWD
@@ -16,10 +17,13 @@ From: centos:latest
  # ensure that /etc/profile is sourced upon opening image
  mkdir -p $SINGULARITY_ROOTS/.singularity.d/env
  echo "source /etc/profile" >> $SINGULARITY_ROOTFS/.singularity.d/env/80-custom.sh
+ echo "alias h='cd /home/sciortino'" >> $SINGULARITY_ROOTFS/.singularity.d/env/80-custom.sh
+ echo "module purge" >> $SINGULARITY_ROOTFS/.singularity.d/env/80-custom.sh
  chmod u+x $SINGULARITY_ROOTFS/.singularity.d/env/80-custom.sh
 
+
 %files
- /home/sciortino/fs_singularity/mdsplus_centos7.sh 
+ /home/sciortino/fs_singularity/mdsplus_centos7.sh /tmp/mdsplus_centos7.sh
 
 %post
  yum -y update
@@ -44,34 +48,33 @@ From: centos:latest
  yum -y install lapack-devel lapack blas blas-devel
  yum -y install gcc
  yum -y install cmake
- #yum-builddep python-matplotlib
+ yum -y install emacs 
+ #yum-builddep -y python-matplotlib
  #yum -y install python-matplotlib # gets python2.7 version
- yum -y install python-nlopt
+ #yum -y install python-nlopt
 
 # Python pip installations (MITIM compatibility)
  pip install --upgrade pip
  pip install numpy==1.10.4
  pip install scipy==0.17.0
- pip install scikit-image
- pip install scikit-learn
- pip install scikit-neuralnetwork
  pip install periodictable
  pip install emcee==2.1.0
  pip install sobol==0.9
- pip install -U pip setuptools wheel
- pip install ipython==4.1.1
- pip install sklearn
+ pip install -U setuptools wheel
+ pip install 'ipython[all]==4.1.1'
+ pip install scikit-image==0.12.3
  pip install pymysql
  pip install numdifftools==0.9.16
+ python -mpip install -U matplotlib
 
-echo "Get OpenMPI from yum"
-yum -y install openmpi openmpi-devel
+echo "OpenMPI (from yum)"
+ yum -y install openmpi openmpi-devel
 
 # Load module command
-source /etc/profile.d/modules.sh
-yum install environment-modules
-module add mpi/openmpi-x86_64
-echo "mpirun location: " which mpirun
+ source /etc/profile.d/modules.sh
+ yum install environment-modules
+ module add mpi/openmpi-x86_64
+ echo "mpirun location: " which mpirun
 
 
  #echo "Installing OpenMPI into container..."
@@ -89,44 +92,42 @@ echo "mpirun location: " which mpirun
 # Ref: www.olmjo.com/blog/2012/09/30/openmpi-warning
 # OMPI_MCA_mpi_show_handle_leaks=1
 # export OMPI_MCA_mpi_show_handle_leaks
- 
- echo "Installed OpenMPI. Now mpi4py..."
+
+
+echo "Installed OpenMPI. Now mpi4py..."
  pip install mpi4py
 
 
 echo "Installing MultiNest"
-git clone https://github.com/JohannesBuchner/MultiNest.git
-cd MultiNest/build
-cmake ..
-make
-make install
-cd $HOME
-export LD_LIBRARY_PATH=/home/sciortino/MultiNest/lib/:$LD_LIBRARY_PATH
+ git clone https://github.com/JohannesBuchner/MultiNest.git
+ cd MultiNest/build
+ cmake ..
+ make
+ make install
+ cd $HOME
+ export LD_LIBRARY_PATH=/MultiNest/lib/:$LD_LIBRARY_PATH #also exported in environment section
 
 
 echo "Installing PyMultiNest"
-git clone https://github.com/JohannesBuchner/PyMultiNest.git
-cd PyMultiNest
-python setup.py install
-cd $HOME 
+ git clone https://github.com/JohannesBuchner/PyMultiNest.git
+ cd PyMultiNest
+ python setup.py install
+ cd $HOME 
 
 
-echo "Obtaining eqtools, gptools and profiletools"
-# Install numpy 1.10.4 again since eqtools only works with that version
-# Some other package (in the pip list) automatically changes version...
-pip install numpy==1.10.4
-pip install eqtools
-pip install Cython
-pip install gptools
-# no pip installation is available for profiletools
-git clone https://github.com/markchil/profiletools.git
+echo "Obtaining gptools and profiletools"
+ pip install Cython==0.23.4
+ pip install gptools
+ # no pip installation is available for profiletools
+ git clone https://github.com/markchil/profiletools.git
 
- 
+
 echo "Get Toroidal Radiation Inversion Protocol (Python)"
-git clone https://github.com/fsciortino/TRIPPy
+ git clone https://github.com/fsciortino/TRIPPy
+
 
 echo "******** Get MITIM codes ******"
-git clone https://github.com/fsciortino/MITIM
+ git clone https://github.com/fsciortino/MITIM
 
 
 echo "Creating engaging-like directories"
@@ -135,7 +136,22 @@ echo "Creating engaging-like directories"
  HOME=/home/sciortino
  alias h='cd $HOME'
 
+
+# eqtools only works with numpy==1.10.4. Use virtual environment
+echo "Installing virtualenv with numpy==1.10.4"
+ pip install virtualenv
+ virtualenv --system-site-packages fs_venv
+ source fs_venv/bin/activate
+ pip install --ignore-installed numpy==1.10.4
+ # use eqtools fork by M.Churchill, which accounts for updated MDSplus exceptions
+ git clone https://github.com/rmchurch/eqtools.git
+ cd eqtools
+ python setup.py install 
+ # pip install eqtools
+ deactivate
+
+
 %labels
  Maintainer  F.Sciortino
- Version v1.1
- email sciortino@psfc.mit.edu
+ Version v1.2
+ email: sciortino@psfc.mit.edu
