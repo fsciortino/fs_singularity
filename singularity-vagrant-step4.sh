@@ -18,13 +18,17 @@ From: centos:latest
 
 %runscript
  exec echo "Singularity container for the MITIM framework"
+ 
 
 %help
  Container for the MITIM framework.
 
 %environment
  export LC_ALL=C
- export LD_LIBRARY_PATH=/MultiNest/lib/:$LD_LIBRARY_PATH
+ export LD_LIBRARY_PATH=/codes_repo/MultiNest/lib/:$LD_LIBRARY_PATH
+ export PYTHONPATH=/codes_repo:/codes_repo/MITIM:/codes_repo/eqtools:/codes_repo/TRIPPy:/codes_repo/PyMultiNest:/codes_repo/profiletools:/home/sciortino:$PYTHONPATH
+
+
 
 %setup
  echo "Working dir is" $PWD
@@ -34,9 +38,12 @@ From: centos:latest
  echo "source /etc/profile" >> $SINGULARITY_ROOTFS/.singularity.d/env/80-custom.sh
  echo "alias h='cd /home/sciortino'" >> $SINGULARITY_ROOTFS/.singularity.d/env/80-custom.sh
  echo "module purge" >> $SINGULARITY_ROOTFS/.singularity.d/env/80-custom.sh
+ echo "source /codes_repo/fs_env/bin/activate" >> $SINGULARITY_ROOTFS/.singularity.d/env/80-custom.sh
+
+ echo "echo '80-custum.sh script was sourced'"
  chmod u+x $SINGULARITY_ROOTFS/.singularity.d/env/80-custom.sh
 
-
+ 
 %files
  /home/sciortino/fs_singularity/mdsplus_centos7.sh /tmp/mdsplus_centos7.sh
 
@@ -51,6 +58,7 @@ From: centos:latest
  yum -y install nmap-ncat
  yum -y install telnet
  yum -y install wget
+ yum -y install mlocate
 
  # Require python 2.7
  echo "Python version: "
@@ -66,7 +74,8 @@ From: centos:latest
  yum -y install emacs 
  #yum-builddep -y python-matplotlib
  #yum -y install python-matplotlib # gets python2.7 version
- #yum -y install python-nlopt
+ yum -y install python-nlopt
+ yum -y install flex
 
 # Python pip installations (MITIM compatibility)
  pip install --upgrade pip
@@ -82,36 +91,42 @@ From: centos:latest
  pip install numdifftools==0.9.16
  python -mpip install -U matplotlib
 
-echo "OpenMPI (from yum)"
+# ----------- OpenMPI installation ------------
+
+ # Save cloned repos to a specific directory (accessible without root permissions)
+ mkdir /codes_repo
+ cd /codes_repo
+
+ echo "OpenMPI (from yum)"
  yum -y install openmpi openmpi-devel
 
-# Load module command
- source /etc/profile.d/modules.sh
- yum install environment-modules
- module add mpi/openmpi-x86_64
- echo "mpirun location: " which mpirun
+ ## Make module command available
+ source /etc/profile
+ yum -y install environment-modules
+ source /etc/profile
 
-
- #echo "Installing OpenMPI into container..."
- #yum -y install flex
+## -- Get OpenMPI from git Master
+ #echo "Installing OpenMPI from git Master into container..."
  #git clone https://github.com/open-mpi/ompi.git
  #cd ompi
  #./autogen.pl
  #./configure --prefix=/usr/local
  #make
  #make install
- #cd $HOME
- #module add mpi/openmpi-x86_64
+ #cd /codes_repo
+ 
+ module add mpi/openmpi-x86_64
+ echo "mpirun location: " which mpirun
 
-# Exclude openib from OpenMPI BTL component search
-# Ref: www.olmjo.com/blog/2012/09/30/openmpi-warning
+## Exclude openib from OpenMPI BTL component search
+## Ref: www.olmjo.com/blog/2012/09/30/openmpi-warning
 # OMPI_MCA_mpi_show_handle_leaks=1
 # export OMPI_MCA_mpi_show_handle_leaks
 
-
-echo "Installed OpenMPI. Now mpi4py..."
+ echo "Installed OpenMPI. Now mpi4py..."
  pip install mpi4py
 
+# -------------------------
 
 echo "Installing MultiNest"
  git clone https://github.com/JohannesBuchner/MultiNest.git
@@ -119,15 +134,15 @@ echo "Installing MultiNest"
  cmake ..
  make
  make install
- cd $HOME
- export LD_LIBRARY_PATH=/MultiNest/lib/:$LD_LIBRARY_PATH #also exported in environment section
+ cd /codes_repo
+ export LD_LIBRARY_PATH=/codes_repo/MultiNest/lib/:$LD_LIBRARY_PATH #also exported in environment section
 
 
 echo "Installing PyMultiNest"
  git clone https://github.com/JohannesBuchner/PyMultiNest.git
  cd PyMultiNest
  python setup.py install
- cd $HOME 
+ cd /codes_repo 
 
 
 echo "Obtaining gptools and profiletools"
@@ -148,15 +163,14 @@ echo "******** Get MITIM codes ******"
 echo "Creating engaging-like directories"
  mkdir -p /nobackup1c/users/sciortino
  mkdir -p /home/sciortino
- HOME=/home/sciortino
- alias h='cd $HOME'
+ 
 
 
 # eqtools only works with numpy==1.10.4. Use virtual environment
 echo "Installing virtualenv with numpy==1.10.4"
  pip install virtualenv
- virtualenv --system-site-packages fs_venv
- source fs_venv/bin/activate
+ virtualenv --system-site-packages fs_env
+ source fs_env/bin/activate
  pip install --ignore-installed numpy==1.10.4
  # use eqtools fork by M.Churchill, which accounts for updated MDSplus exceptions
  git clone https://github.com/rmchurch/eqtools.git
@@ -164,11 +178,11 @@ echo "Installing virtualenv with numpy==1.10.4"
  python setup.py install 
  # pip install eqtools
  deactivate
-
+ cd /codes_repo
 
 %labels
  Maintainer  F.Sciortino
- Version v1.2
+ Version v1.3
  email: sciortino@psfc.mit.edu
 EOFA
 
